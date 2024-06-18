@@ -1,41 +1,32 @@
-from rest_framework.decorators import api_view
 from polls.models import Question
 from polls_api.serializers import QuestionSerializer
-from rest_framework.response import Response
-from rest_framework import status
-from django.shortcuts import get_object_or_404
+from rest_framework import generics
+from django.contrib.auth.models import User
+from polls_api.serializers import UserSerializer
+from polls_api.serializers import RegisterSerializer
+from rest_framework import generics,permissions
+from .permissions import IsOwnerOrReadOnly
 
-@api_view(['GET','POST'])
-def question_list(request):
-    if request.method == 'GET':
-        questions = Question.objects.all()
-        serializer = QuestionSerializer(questions, many = True)
-        return Response(serializer.data)
+class QuestionList(generics.ListCreateAPIView):
+    queryset = Question.objects.all()
+    serializer_class = QuestionSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     
-    if request.method == 'POST':
-        serializer = QuestionSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
 
-@api_view(['GET', 'PUT', 'DELETE'])
-def question_detail(request, id):
-    question = get_object_or_404(Question, pk=id)
+class QuestionDetail(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Question.objects.all()
+    serializer_class = QuestionSerializer
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
     
-    if request.method == 'GET':
-        serializer = QuestionSerializer(question)
-        return Response(serializer.data)
+class UserList(generics.ListAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    
+class UserDetail(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
-    if request.method == 'PUT':
-        serializer = QuestionSerializer(question, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        else:    
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    if request.method == 'DELETE':
-        question.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+class RegisterUser(generics.CreateAPIView):
+    serializer_class = RegisterSerializer
